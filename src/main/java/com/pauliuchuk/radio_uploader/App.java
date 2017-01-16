@@ -1,13 +1,12 @@
 package com.pauliuchuk.radio_uploader;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.URLConnection;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +29,13 @@ public class App
 
     public static void main(String[] args) throws Exception
     {
+        // Checking that a directory is exist
+        File file = new File(UPLOAD_DIR);
+        if (!file.exists())
+        {
+            file.mkdirs();
+        }
+
         App app = new App();
         List<Station> stations = app.getStations();
 
@@ -39,7 +45,8 @@ public class App
         // Future house radio today
         Day day = future.getDays().get(1);
         day.setTracks(app.getTracks(day));
-        app.uploadTracks(day.getTracks().subList(0, 1));
+        app.uploadTracks(day.getTracks().subList(0, 3));
+        System.out.println("END");
     }
 
     private List<Station> getStations() throws IOException
@@ -94,7 +101,7 @@ public class App
             {
                 Track track = new Track();
                 track.setPlayTime(url.substring(0, 8));
-                track.setUrl(new URL(day.getUrl() + url));
+                track.setUrl(new URL((day.getUrl() + url).replaceAll(" ", "%20")));
                 track.setName(url.substring(11));
                 tracks.add(track);
             }
@@ -106,16 +113,35 @@ public class App
     {
         for (Track track : tracks)
         {
-            URLConnection conn = track.getUrl().openConnection();
-            InputStream is = conn.getInputStream();
-            OutputStream outstream = new FileOutputStream(new File(UPLOAD_DIR + "/" + track.getName()));
-            byte[] buffer = new byte[4096];
-            int len;
-            while ((len = is.read(buffer)) > 0)
+            System.out.println(track.getUrl());
+
+            HttpURLConnection conn = (HttpURLConnection) track.getUrl().openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("User-Agent", USER_AGENT);
+            conn.setDoOutput(true);
+            BufferedInputStream bis = new BufferedInputStream(conn.getInputStream());
+
+            // FileWriter fw = new Fil
+            File f1 = new File(UPLOAD_DIR + "/" + track.getName());
+            if (!f1.exists() && f1.length() != conn.getContentLength())
             {
-                outstream.write(buffer, 0, len);
+                FileOutputStream fw = new FileOutputStream(f1);
+
+                byte[] b = new byte[1024];
+                int count;
+
+                while ((count = bis.read(b)) != -1)
+                    fw.write(b, 0, count);
+
+                fw.close();
             }
-            outstream.close();
+            else
+            {
+                System.out.println("File exist");
+            }
+
+            conn.disconnect();
+            System.out.println("OK - " + track.getName());
         }
     }
 
