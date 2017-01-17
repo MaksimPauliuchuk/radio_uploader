@@ -42,10 +42,12 @@ public class App
         // Future house radio
         Station future = stations.get(6);
         future.setDays(app.getDays(future));
-        // Future house radio today
-        Day day = future.getDays().get(1);
-        day.setTracks(app.getTracks(day));
-        app.uploadTracks(day.getTracks().subList(0, 3));
+
+        for (Day day : future.getDays())
+        {
+            day.setTracks(app.getTracks(day));
+            app.uploadTracks(day.getTracks());
+        }
         System.out.println("END");
     }
 
@@ -111,6 +113,7 @@ public class App
 
     private void uploadTracks(List<Track> tracks) throws Exception
     {
+        int isEx = 0;
         for (Track track : tracks)
         {
             System.out.println(track.getUrl());
@@ -119,12 +122,12 @@ public class App
             conn.setRequestMethod("GET");
             conn.setRequestProperty("User-Agent", USER_AGENT);
             conn.setDoOutput(true);
-            BufferedInputStream bis = new BufferedInputStream(conn.getInputStream());
 
             // FileWriter fw = new Fil
             File f1 = new File(UPLOAD_DIR + "/" + track.getName());
             if (!f1.exists() && f1.length() != conn.getContentLength())
             {
+                BufferedInputStream bis = new BufferedInputStream(conn.getInputStream());
                 FileOutputStream fw = new FileOutputStream(f1);
 
                 byte[] b = new byte[1024];
@@ -137,12 +140,14 @@ public class App
             }
             else
             {
+                isEx++;
                 System.out.println("File exist");
             }
 
             conn.disconnect();
             System.out.println("OK - " + track.getName());
         }
+        System.out.println(isEx + " files already exist");
     }
 
 }
