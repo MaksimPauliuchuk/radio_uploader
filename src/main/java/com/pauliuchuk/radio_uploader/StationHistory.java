@@ -3,7 +3,7 @@ package com.pauliuchuk.radio_uploader;
 import java.net.URL;
 import java.util.List;
 
-public class Station
+public class StationHistory
 {
     private String name;
     private URL url;
@@ -42,7 +42,7 @@ public class Station
     @Override
     public String toString()
     {
-        return "Station [name=" + name + ", url=" + url + ", days=" + days + "]";
+        return "StationHistory [name=" + name + ", url=" + url + ", days=" + days + "]";
     }
 
 }

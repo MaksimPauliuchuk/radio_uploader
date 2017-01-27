@@ -10,6 +10,7 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -24,36 +25,91 @@ import org.jsoup.select.Elements;
 public class App
 {
     final static String URL_EVERYDAY = "http://history.radiorecord.ru/air/";
-    final static String UPLOAD_DIR = "d:/radio";
+    final static String URL_TOP100 = "http://78.140.251.40/tmp_audio/top100/";
+    final static String UPLOAD_DIR_HISTORY = "e:/radio/history/";
+    final static String UPLOAD_DIR_TOP100 = "e:/radio/top100/";
+    static String UPLOAD_DIR = "";
     final static String USER_AGENT = "Mozilla/5.0";
 
     public static void main(String[] args) throws Exception
     {
-        // Checking that a directory is exist
-        File file = new File(UPLOAD_DIR);
-        if (!file.exists())
-        {
-            file.mkdirs();
-        }
+        System.setProperty("java.net.useSystemProxies", "true");
 
+        Scanner sc = new Scanner(System.in);
         App app = new App();
-        List<Station> stations = app.getStations();
 
-        // Future house radio
-        Station future = stations.get(6);
-        future.setDays(app.getDays(future));
+        System.out.println("1 history\n2 top 100\nother number - exit");
+        int inputNumber = sc.nextInt();
+        int i = 1;
+        File file;
 
-        for (Day day : future.getDays())
+        switch (inputNumber)
         {
-            day.setTracks(app.getTracks(day));
-            app.uploadTracks(day.getTracks());
+            case 1:
+                List<StationHistory> stationsHistory = app.getStationsHistory();
+                i = 1;
+                for (StationHistory station : stationsHistory)
+                {
+                    System.out.println(i + " " + station.getName());
+                    i++;
+                }
+                inputNumber = sc.nextInt();
+                inputNumber--;
+                System.out.println("\n-----------------------------\n");
+
+                // Create folder if it is not exist
+                UPLOAD_DIR += UPLOAD_DIR_HISTORY + stationsHistory.get(inputNumber).getName();
+                file = new File(UPLOAD_DIR);
+                if (!file.exists())
+                {
+                    file.mkdirs();
+                }
+                // Get days by station
+                stationsHistory.get(inputNumber).setDays(app.getDays(stationsHistory.get(inputNumber)));
+                for (Day day : stationsHistory.get(inputNumber).getDays())
+                {
+
+                    // Get tracks on day
+                    day.setTracks(app.getTracks(day));
+
+                    // Upload tracks on day
+                    app.uploadTracks(day.getTracks());
+                }
+                break;
+
+            case 2:
+                List<StationTOP100> stationsTOP100 = app.getStationsTOP100();
+                i = 1;
+                for (StationTOP100 station : stationsTOP100)
+                {
+                    System.out.println(i + " " + station.getName());
+                    i++;
+                }
+                inputNumber = sc.nextInt();
+                inputNumber--;
+                System.out.println("\n-----------------------------\n");
+
+                // Create folder if it is not exist
+                UPLOAD_DIR += UPLOAD_DIR_HISTORY + stationsTOP100.get(inputNumber).getName();
+                file = new File(UPLOAD_DIR);
+                if (!file.exists())
+                {
+                    file.mkdirs();
+                }
+
+                stationsTOP100.get(inputNumber).setTracks(app.getTracks(stationsTOP100.get(inputNumber)));
+                app.uploadTracks(stationsTOP100.get(inputNumber).getTracks());
+                break;
+            default:
+                break;
         }
-        System.out.println("END");
+        System.out.println("Good bye");
+        sc.close();
     }
 
-    private List<Station> getStations() throws IOException
+    private List<StationHistory> getStationsHistory() throws IOException
     {
-        List<Station> stations = new ArrayList<Station>();
+        List<StationHistory> stations = new ArrayList<StationHistory>();
 
         Document doc = Jsoup.connect(URL_EVERYDAY).get();
         Elements links = doc.getElementsByTag("a");
@@ -61,7 +117,7 @@ public class App
         links.remove(0);
         for (Element a : links)
         {
-            Station station = new Station();
+            StationHistory station = new StationHistory();
             station.setName(a.html().substring(0, a.html().length() - 1));
             station.setUrl(new URL(URL_EVERYDAY + a.attr("href")));
             stations.add(station);
@@ -69,7 +125,25 @@ public class App
         return stations;
     }
 
-    private List<Day> getDays(Station station) throws IOException
+    private List<StationTOP100> getStationsTOP100() throws IOException
+    {
+        List<StationTOP100> stations = new ArrayList<StationTOP100>();
+
+        Document doc = Jsoup.connect(URL_TOP100).get();
+        Elements links = doc.getElementsByTag("a");
+        // remove back link
+        links.remove(0);
+        for (Element a : links)
+        {
+            StationTOP100 station = new StationTOP100();
+            station.setName(a.html().substring(0, a.html().length() - 1));
+            station.setUrl(new URL(URL_TOP100 + a.attr("href")));
+            stations.add(station);
+        }
+        return stations;
+    }
+
+    private List<Day> getDays(StationHistory station) throws IOException
     {
         List<Day> days = new ArrayList<Day>();
         Document doc = Jsoup.connect(station.getUrl().toString()).get();
@@ -111,6 +185,24 @@ public class App
         return tracks;
     }
 
+    private List<Track> getTracks(StationTOP100 station) throws IOException, URISyntaxException
+    {
+        List<Track> tracks = new ArrayList<Track>();
+        Document doc = Jsoup.connect(station.getUrl().toString()).get();
+        Elements links = doc.getElementsByTag("a");
+        // remove back link
+        links.remove(0);
+        for (Element a : links)
+        {
+            String url = URLDecoder.decode(a.attr("href"), "UTF-8");
+            Track track = new Track();
+            track.setUrl(new URL((station.getUrl() + url).replaceAll(" ", "%20")));
+            track.setName(url.substring(4));
+            tracks.add(track);
+        }
+        return tracks;
+    }
+
     private void uploadTracks(List<Track> tracks) throws Exception
     {
         int isEx = 0;
@@ -123,9 +215,9 @@ public class App
             conn.setRequestProperty("User-Agent", USER_AGENT);
             conn.setDoOutput(true);
 
-            // FileWriter fw = new Fil
             File f1 = new File(UPLOAD_DIR + "/" + track.getName());
-            if (!f1.exists() && f1.length() != conn.getContentLength())
+            if (!f1.exists()
+                    && (f1.length() > conn.getContentLength() - 100 || f1.length() < conn.getContentLength() + 100))
             {
                 BufferedInputStream bis = new BufferedInputStream(conn.getInputStream());
                 FileOutputStream fw = new FileOutputStream(f1);
@@ -149,5 +241,4 @@ public class App
         }
         System.out.println(isEx + " files already exist");
     }
-
 }
